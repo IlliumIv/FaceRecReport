@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Macroscop_FaceRecReport": {
+      "commandName": "Project",
+      "commandLineArgs": "--server 127.0.0.1 --login root --starttime \"10.07.2022 06:21:18\" --endtime \"14.07.2022 07:00\""
+    }
+  }
+}
