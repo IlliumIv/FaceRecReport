@@ -1,14 +1,10 @@
-﻿using Macroscop_FaceRecReport.ConfigurationEntities;
-using Macroscop_FaceRecReport.Enums;
-using MigraDoc.DocumentObjectModel;
-using MigraDoc.DocumentObjectModel.Shapes;
-using MigraDoc.DocumentObjectModel.Tables;
+﻿using System.Text;
 using MigraDoc.Rendering;
-using Newtonsoft.Json;
-using SixLabors.ImageSharp;
-using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
+using MigraDoc.DocumentObjectModel;
+using MigraDoc.DocumentObjectModel.Tables;
+using Macroscop_FaceRecReport.Enums;
+using Macroscop_FaceRecReport.Helpers;
+using Macroscop_FaceRecReport.Entities;
 
 namespace Macroscop_FaceRecReport
 {
@@ -16,65 +12,86 @@ namespace Macroscop_FaceRecReport
     {
         static string ServerHost = string.Empty;
         static ushort ServerPort = 8080;
-        static string ServerLogin = string.Empty;
-        static string ServerPassword = "";
+        public static string ServerLogin = string.Empty;
+        public static string ServerPassword = "";
         static DateTime StartTime;
-        static DateTime EndTime;
+        static DateTime EndTime = DateTime.Now;
         static string ChannelId = string.Empty;
         static FileInfo? OutputFile;
         static int ImagesWidth = 100;
         static int FontSize = 8;
         static PageFormat PageFormat = PageFormat.A4;
+        static bool ExtractImagesFromDatabase = false;
 
-        public static HashSet<Event> Events = new();
+        public static string AuthString => $"{ServerLogin}:{ServerPassword.CreateMD5()}";
+        private static readonly string _faceDetectEventId = "427f1cc3-2c2f-4f50-8865-56ae99c3610d";
+
+        static readonly HashSet<Event> Events = new();
+        public static HttpClient MacroscopHttpClient = new();
 
         public static void Main(string[] args)
         {
             ParseArgs(args);
             if (ServerHost == string.Empty || ServerLogin == string.Empty) return;
 
-            try
-            {
-                var macroscopClient = new HttpClient();
-                macroscopClient.BaseAddress = new Uri($"http://{ServerHost}:{ServerPort}");
-                var request = $"specialarchiveevents?startTime={StartTime}&endTime={EndTime}&eventId=427f1cc3-2c2f-4f50-8865-56ae99c3610d";
-                request += ChannelId == string.Empty ? "" : $"&channelid={ChannelId}";
-                var message = new HttpRequestMessage(HttpMethod.Get, request);
-                var auth = $"{ServerLogin}:{CreateMD5(ServerPassword)}";
-                message.Headers.Add("Authorization", $"Basic {Convert.ToBase64String(Encoding.ASCII.GetBytes(auth))}");
-                var response = macroscopClient.Send(message);
+            MacroscopHttpClient.BaseAddress = new Uri($"http://{ServerHost}:{ServerPort}");
+            var starttime = StartTime;
 
-                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+            // Macroscop can return only first 1000 events at one time. We should send new request to reach remaining events.
+            // See "specialarchiveevents" documentation: https://macroscop.com/media/5348/download/macroscop-sdk-api-ru.pdf?v=3 page 55.
+            // Supported Macroscop 2.1+
+            while (Events.Count % 1000 == 0)
+            {
+                try 
                 {
-                    var answer = response.Content.ReadAsStringAsync().Result;
-                    if (answer == string.Empty) Console.WriteLine($"Empty answer for request:\n{response.RequestMessage}");
-                    else ParseAnswer(answer);
-                    ProceedEvents();
+                    var request = $"specialarchiveevents?startTime={starttime.ToUniversalTime()}&endTime={EndTime.ToUniversalTime()}&eventId={_faceDetectEventId}";
+                    request += ChannelId == string.Empty ? "" : $"&channelid={ChannelId}";
+                    var message = new HttpRequestMessage(HttpMethod.Get, request);
+                    message.Headers.Add("Authorization", $"Basic {Convert.ToBase64String(Encoding.ASCII.GetBytes(AuthString))}");
+                    var response = MacroscopHttpClient.Send(message);
+
+                    if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                    {
+                        var answer = response.Content.ReadAsStringAsync().Result;
+
+                        if (answer == string.Empty)
+                        {
+                            Console.WriteLine($"Empty answer for request:\n{response.RequestMessage}");
+                            return;
+                        }
+
+                        var events = ParseAnswer(answer);
+                        if (events.Count > 0) Events.UnionWith(events);
+                        starttime = events.Last().Timestamp;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"{e.Message}");
+                    return;
                 }
             }
-            catch (HttpRequestException e) when (e.InnerException is IOException)
-            {
-                Console.WriteLine($"{e.Message} {e.InnerException.Message}");
-            }
+
+            ProceedEvents();
         }
 
         private static void ProceedEvents()
         {
             if (Events.Count == 0) return;
 
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
             var document = new Document();
             document.Info.Author = "IlliumIv";
             document.CreateDocument();
-
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
             var pdf = new PdfDocumentRenderer(true);
             pdf.Document = document;
             pdf.RenderDocument();
             var filePath = OutputFile != null? OutputFile.FullName : $"Отчёт распознавания лиц {StartTime:dd.MM.yyyy HH.mm.ss} - {EndTime:dd.MM.yyyy HH.mm.ss}.pdf";
-            try { pdf.Save(filePath); }
-            catch (Exception e) { Console.WriteLine(e.Message); }
+            pdf.Save(filePath);
         }
+
         private static void CreateDocument(this Document document)
         {
             var section = document.AddSection();
@@ -99,7 +116,7 @@ namespace Macroscop_FaceRecReport
             paragraph.Format.Font.Size = FontSize + 10;
 
             paragraph = section.AddParagraph();
-            paragraph.AddText($"Период: {StartTime:dd.MM.yyyy HH.mm.ss} - {EndTime:dd.MM.yyyy HH.mm.ss}");
+            paragraph.AddText($"Период: {StartTime:dd.MM.yyyy HH.mm.ss} - {EndTime:dd.MM.yyyy HH.mm.ss}. Событий: {Events.Count}");
             paragraph.Format.Alignment = ParagraphAlignment.Center;
             paragraph.Format.Font.Size = FontSize;
             paragraph.Format.SpaceBefore = 6;
@@ -109,28 +126,36 @@ namespace Macroscop_FaceRecReport
             table.Borders.Color = Colors.Black;
             table.Borders.Width = 0.25;
             table.Format.Font.Size = FontSize;
-            table.LeftPadding = 0;
-            table.RightPadding = 0;
             table.Rows.Alignment = RowAlignment.Center;
 
-            var columns = new string[9]
+            var column = table.AddColumn();
+            column.Width = FontSize * 6;
+            column.Format.Alignment = ParagraphAlignment.Center;
+            column = table.AddColumn();
+            column.LeftPadding = 0;
+            column.Width = ImagesWidth * 0.75;
+            if (ExtractImagesFromDatabase)
             {
-                "Время",
-                "Фото",
-                "ФИО",
-                "Доп. информация",
-                "Группы",
-                "Камера",
-                "Пол",
-                "Возраст",
-                "Эмоции",
-            };
+                column = table.AddColumn();
+                column.LeftPadding = 0;
+                column.Width = ImagesWidth * 0.75;
+            }
 
-            for (int i = 0; i < columns.Length; i++) table.AddColumn();
-
-            table.Columns[0].Width = 50;
-            table.Columns[1].Width = ImagesWidth * 0.75;
-            table.Columns[7].Width = 50;
+            column = table.AddColumn();
+            column.Width = FontSize * 12;
+            column = table.AddColumn();
+            column.Width = FontSize * 12;
+            table.AddColumn();
+            column = table.AddColumn();
+            column.Width = FontSize * 12;
+            column = table.AddColumn();
+            column.Width = FontSize * 5;
+            column.Format.Alignment = ParagraphAlignment.Center;
+            column = table.AddColumn();
+            column.Width = FontSize * 5;
+            column.Format.Alignment = ParagraphAlignment.Center;
+            column = table.AddColumn();
+            column.Width = FontSize * 12;
 
             var row = table.AddRow();
             row.HeadingFormat = true;
@@ -140,15 +165,19 @@ namespace Macroscop_FaceRecReport
             row.Format.Alignment = ParagraphAlignment.Center;
             row.VerticalAlignment = VerticalAlignment.Center;
             row.Shading.Color = Colors.LightGray;
-            for (int i = 0; i < columns.Length; i++) row[i].AddParagraph(columns[i]);
 
-            var textFrame = new TextFrame { MarginLeft = 3, MarginRight = 3 };
-            paragraph = textFrame.AddParagraph();
-            var text = new Text();
-            paragraph.Add(text);
-            paragraph.Format.Font.Size = FontSize;
-            paragraph.Format.SpaceBefore = 2;
-            paragraph.Format.SpaceAfter = 2;
+            var offset = ExtractImagesFromDatabase ? 1 : 0;
+
+            row[0].AddParagraph("Время");
+            row[1].AddParagraph("Фото");
+            if (ExtractImagesFromDatabase) row[2].AddParagraph("Фото в базе");
+            row[offset + 2].AddParagraph("ФИО, Уверенность");
+            row[offset + 3].AddParagraph("Доп. информация");
+            row[offset + 4].AddParagraph("Группы");
+            row[offset + 5].AddParagraph("Камера");
+            row[offset + 6].AddParagraph("Пол");
+            row[offset + 7].AddParagraph("Возраст");
+            row[offset + 8].AddParagraph("Эмоции");
 
             foreach (var macroscopEvent in Events)
             {
@@ -157,47 +186,48 @@ namespace Macroscop_FaceRecReport
                 row.HeightRule = RowHeightRule.Exactly;
                 row.Height = ImagesWidth * 0.75;
 
-                text.Content = $"{macroscopEvent.Timestamp.ToLocalTime()}";
-                row[0].Add(textFrame.Clone());
-                var imageWithFormat = macroscopEvent.GetImageWithFormat(ImagesWidth, 0);
-                string imageFileName = "base64:" + imageWithFormat.Image.ToBase64String(imageWithFormat.Format).Split(',')[1];
-                row[1].AddImage(imageFileName);
-                var similarity = macroscopEvent.Similarity > 0 ? $", {string.Format("{0:P0}", macroscopEvent.Similarity).Replace(" ", "")}" : "";
-                text.Content = $"{macroscopEvent.Patronymic} {macroscopEvent.LastName} {macroscopEvent.LastName}{similarity}";
-                row[2].Add(textFrame.Clone());
-                text.Content = $"{macroscopEvent.AdditionalInfo}";
-                row[3].Add(textFrame.Clone());
-                text.Content = $"{string.Join(", ", macroscopEvent.Groups)}";
-                row[4].Add(textFrame.Clone());
-                text.Content = $"{macroscopEvent.ChannelName}";
-                row[5].Add(textFrame.Clone());
-                text.Content = $"{StringEnum.GetStringValue(macroscopEvent.Gender)}";
-                row[6].Add(textFrame.Clone());
-                text.Content = $"{macroscopEvent.Age}";
-                row[7].Add(textFrame.Clone());
-                text.Content = $"{StringEnum.GetStringValue(macroscopEvent.Emotion)}, {string.Format("{0:P2}", macroscopEvent.EmotionConfidence).Replace(" ", "")}";
-                row[8].Add(textFrame.Clone());
+                row[0].AddParagraph($"{macroscopEvent.Timestamp.ToLocalTime()}");
+                if (macroscopEvent.TryGetPicture(out var picture, ImagesWidth, 0)) row[1].AddImage("base64:" + picture.Base64);
+                if (ExtractImagesFromDatabase) if (macroscopEvent.TryGetPictureFromDatabase(out picture, ImagesWidth, 0)) row[2].AddImage("base64:" + picture.Base64);
+                var name = $"{macroscopEvent.FirstName} {macroscopEvent.LastName} {macroscopEvent.Patronymic}".Trim();
+                var similarity = macroscopEvent.Similarity > 0 ? $"{string.Format("{0:P0}", macroscopEvent.Similarity).Replace(" ", "")}" : string.Empty;
+                name += name != string.Empty ? $", {similarity}" : similarity;
+                row[offset + 2].AddParagraph($"{name}");
+                row[offset + 3].AddParagraph($"{macroscopEvent.AdditionalInfo}");
+                row[offset + 4].AddParagraph($"{string.Join(", ", macroscopEvent.Groups)}");
+                row[offset + 5].AddParagraph($"{macroscopEvent.ChannelName}");
+                row[offset + 6].AddParagraph($"{StringEnum.GetStringValue(macroscopEvent.Gender)}");
+                row[offset + 7].AddParagraph($"{macroscopEvent.Age}");
+                row[offset + 8].AddParagraph($"{StringEnum.GetStringValue(macroscopEvent.Emotion)}, {string.Format("{0:P2}", macroscopEvent.EmotionConfidence).Replace(" ", "")}");
             }
         }
 
-        private static void ParseAnswer(string answer)
+        /// <summary>
+        /// Split server answer to events.
+        /// </summary>
+        /// <returns>
+        /// HashSet contained server events.
+        /// </returns>
+        private static HashSet<Event> ParseAnswer(string answer)
         {
             using var reader = new StringReader(answer);
             var eventStrings = string.Empty;
             var line = string.Empty;
 
-            var jsonSerializerSettings = new JsonSerializerSettings();
-            jsonSerializerSettings.MissingMemberHandling = MissingMemberHandling.Ignore;
+            var events = new HashSet<Event>();
+
             while ((line = reader.ReadLine()) != null)
             {
                 if (line == "}{")
                 {
-                    var macroscopEvent = new Event(eventStrings + "}");
-                    if (macroscopEvent != null) Events.Add(macroscopEvent);
+                    events.Add(new Event(eventStrings + "}"));
                     eventStrings = "{";
                 }
                 else eventStrings += line;
             }
+
+            events.Add(new Event(eventStrings));
+            return events;
         }
 
         private static void ParseArgs(string[] args)
@@ -224,21 +254,16 @@ namespace Macroscop_FaceRecReport
                             "-imageswidth" => (ImagesWidth = int.Parse(args[i + 1]), i++),
                             "-format" => (PageFormat = Enum.Parse<PageFormat>(args[i + 1]), i++),
                             "-fontsize" => (FontSize = int.Parse(args[i + 1]), i++),
+                            "-withdbimages" => ExtractImagesFromDatabase = true,
+                            "-help" => ShowHelp(),
                             "?" => ShowHelp(),
-                            _ => throw new InvalidOperationException(message: $"Invalid input parameter: \"{args[i]}\"."),
+                            _ => throw new InvalidOperationException(message: $"Invalid input parameter: \"{args[i]}\". Specify --Help to see more."),
                         };
                     }
                 }
-                catch (Exception e) when (
-                    e is InvalidOperationException
-                    || e is ArgumentException
-                ) {
-                    Console.WriteLine(e.Message);
-                    Environment.Exit(1);
-                }
-                catch (IndexOutOfRangeException)
+                catch (Exception e) 
                 {
-                    Console.WriteLine($"Invalid value for parameter: {arg}.");
+                    Console.WriteLine($"Invalid value for parameter: -{arg}. {e.Message} Specify --Help to see more.");
                     Environment.Exit(1);
                 }
             }
@@ -247,34 +272,26 @@ namespace Macroscop_FaceRecReport
         private static object ShowHelp()
         {
             Console.WriteLine("Usage: Macroscop_FaceRecReport --Server  <address> --Port <string> --Login <string> [--Password <string>]");
-            Console.WriteLine("{0,-31}{1}", "", "--StartTime <DateTime> --EndTime <DateTime> [--Channelid <string>]");
-            Console.WriteLine("{0,-31}{1}", "", "[--Output <string>] [--ImagesWidth <int>]");
+            Console.WriteLine("{0,-31}{1}", "", "--StartTime <DateTime> [--EndTime <DateTime>] [--Channelid <string>]");
+            Console.WriteLine("{0,-31}{1}", "", "[--Output <string>] [--ImagesWidth <int>] [--FontSize <int>]");
             Console.WriteLine(string.Format(
-                "\n {0,-24}{1}\n {2,-24}{3}\n {4,-24}{5}\n {6,-24}{7}\n {8,-24}{9}\n {10,-24}{11}\n {12,-24}{13}\n {14,-24}{15}\n {16,-24}{17}\n {18,-24}{19}\n {20,-24}{21}\n",
+                "\n {0,-24}{1}\n {2,-24}{3}\n {4,-24}{5}\n {6,-24}{7}\n {8,-24}{9}\n {10,-24}{11}\n {12,-24}{13}\n {14,-24}{15}\n {16,-24}{17}\n {18,-24}{19}\n {20,-24}{21}\n {22,-24}{23}\n {24,-24}{25}\n",
                 "--Server  <address>", "Server address.",
                 "--Port <string>", "Server port. Default value is 8080. Only ports without encryption are supported.",
-                "--Login <string>", "Login.",
-                "--Password <string>", "Password. Default value is empty string.",
+                "--Login <string>", "Macroscop login.",
+                "--Password <string>", "Macroscop password. Default value is empty string.",
                 "--StartTime <DateTime>", "Specify events start time.",
-                "--EndTime <DateTime>", "Specify events end time.",
+                "--EndTime <DateTime>", "Specify events end time. Default value is now.",
                 "--Channelid <string>", "Specify channelid to filter output to specific channel.",
-                "--Output <string>", "Specify path of .pdf table. By default file will create in current directory.",
-                "--ImagesWidth <int>", "Specify size of images in .pdf table. Default value is 100.",
+                "--Output <string>", "Specify path of .pdf table. By default file will be created in current directory.",
+                "--ImagesWidth <int>", $"Specify size of images in .pdf table. Default value is {ImagesWidth}.",
                 "--Format <string>", $"Specify pages format. Default value is A4. Possible values: {string.Join(", ", (PageFormat[])Enum.GetValues(typeof(PageFormat)))}",
-                "-?", "Show this message and exit."));
+                "--FontSize <int>", $"Specify font size. Default value is {FontSize}.",
+                "--WithDbImages", $"Starts retrieving images for recognized faces from the face database. At least one face recognizing module must be enabled. Images may not be retrieved if the \"external_id\" parameter is not unique or was not set before the generation of the face recognition event.",
+                "--Help, -?", "Show this message and exit."));
 
             Environment.Exit(0);
             return null;
-        }
-
-        private static string CreateMD5(string input)
-        {
-            using var md5 = MD5.Create();
-            var inputBytes = Encoding.ASCII.GetBytes(input);
-            var hashBytes = md5.ComputeHash(inputBytes);
-            var sb = new StringBuilder();
-            for (int i = 0; i < hashBytes.Length; i++) sb.Append(hashBytes[i].ToString("X2", CultureInfo.CurrentCulture));
-            return sb.ToString();
         }
     }
 }

@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Reflection;
 
 namespace Macroscop_FaceRecReport.Enums
 {
@@ -16,6 +11,7 @@ namespace Macroscop_FaceRecReport.Enums
         [StringValue("Мужской")]
         Man
     }
+
     public enum Emotion
     {
         [StringValue("Негативные")]
@@ -26,7 +22,8 @@ namespace Macroscop_FaceRecReport.Enums
         Happiness
     }
 
-    public class StringValue : System.Attribute
+    [AttributeUsage(AttributeTargets.Field)]
+    public class StringValue : Attribute
     {
         private readonly string _value;
         public StringValue(string value) { _value = value; }
@@ -35,12 +32,13 @@ namespace Macroscop_FaceRecReport.Enums
 
     public static class StringEnum
     {
-        public static string GetStringValue(Enum value)
+        public static string? GetStringValue(Enum value)
         {
-            string output = null;
+            string? output = null;
             Type type = value.GetType();
-            FieldInfo fi = type.GetField(value.ToString());
-            StringValue[] attrs = fi.GetCustomAttributes(typeof(StringValue), false) as StringValue[];
+            FieldInfo? fi = type.GetField(value.ToString());
+            if (fi == null) return null;
+            if (fi.GetCustomAttributes(typeof(StringValue), false) is not StringValue[] attrs) return null;
             if (attrs.Length > 0) { output = attrs[0].Value; }
             return output;
         }
