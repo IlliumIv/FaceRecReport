@@ -273,15 +273,15 @@ namespace Macroscop_FaceRecReport
         {
             Console.WriteLine("Usage: Macroscop_FaceRecReport --Server  <address> --Port <string> --Login <string> [--Password <string>]");
             Console.WriteLine("{0,-31}{1}", "", "--StartTime <DateTime> [--EndTime <DateTime>] [--Channelid <string>]");
-            Console.WriteLine("{0,-31}{1}", "", "[--Output <string>] [--ImagesWidth <int>] [--FontSize <int>]");
+            Console.WriteLine("{0,-31}{1}", "", "[--Output <string>] [--ImagesWidth <int>] [--FontSize <int>] [--WithDbImages]");
             Console.WriteLine(string.Format(
                 "\n {0,-24}{1}\n {2,-24}{3}\n {4,-24}{5}\n {6,-24}{7}\n {8,-24}{9}\n {10,-24}{11}\n {12,-24}{13}\n {14,-24}{15}\n {16,-24}{17}\n {18,-24}{19}\n {20,-24}{21}\n {22,-24}{23}\n {24,-24}{25}\n",
                 "--Server  <address>", "Server address.",
                 "--Port <string>", "Server port. Default value is 8080. Only ports without encryption are supported.",
                 "--Login <string>", "Macroscop login.",
                 "--Password <string>", "Macroscop password. Default value is empty string.",
-                "--StartTime <DateTime>", "Specify events start time.",
-                "--EndTime <DateTime>", "Specify events end time. Default value is now.",
+                "--StartTime <DateTime>", "Specify events start local time.",
+                "--EndTime <DateTime>", "Specify events end local time. Default value is now.",
                 "--Channelid <string>", "Specify channelid to filter output to specific channel.",
                 "--Output <string>", "Specify path of .pdf table. By default file will be created in current directory.",
                 "--ImagesWidth <int>", $"Specify size of images in .pdf table. Default value is {ImagesWidth}.",
