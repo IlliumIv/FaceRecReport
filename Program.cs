@@ -35,7 +35,7 @@ namespace Macroscop_FaceRecReport
             if (ServerHost == string.Empty || ServerLogin == string.Empty) return;
 
             MacroscopHttpClient.BaseAddress = new Uri($"http://{ServerHost}:{ServerPort}");
-            var starttime = StartTime;
+            var starttime = StartTime.ToUniversalTime();
 
             // Macroscop can return only first 1000 events at one time. We should send new request to reach remaining events.
             // See "specialarchiveevents" documentation: https://macroscop.com/media/5348/download/macroscop-sdk-api-ru.pdf?v=3 page 55.
@@ -44,17 +44,19 @@ namespace Macroscop_FaceRecReport
             {
                 try 
                 {
-                    var request = $"specialarchiveevents?startTime={starttime.ToUniversalTime()}&endTime={EndTime.ToUniversalTime()}&eventId={_faceDetectEventId}";
+                    var request = $"specialarchiveevents?startTime={starttime}&endTime={EndTime.ToUniversalTime()}&eventId={_faceDetectEventId}";
                     request += ChannelId == string.Empty ? "" : $"&channelid={ChannelId}";
                     var message = new HttpRequestMessage(HttpMethod.Get, request);
                     message.Headers.Add("Authorization", $"Basic {Convert.ToBase64String(Encoding.ASCII.GetBytes(AuthString))}");
+
+                    Console.WriteLine(message.RequestUri);
                     var response = MacroscopHttpClient.Send(message);
 
                     if (response.StatusCode == System.Net.HttpStatusCode.OK)
                     {
                         var answer = response.Content.ReadAsStringAsync().Result;
 
-                        if (answer == string.Empty)
+                        if (string.IsNullOrEmpty(answer))
                         {
                             Console.WriteLine($"Empty answer for request:\n{response.RequestMessage}");
                             return;
@@ -62,6 +64,7 @@ namespace Macroscop_FaceRecReport
 
                         var events = ParseAnswer(answer);
                         if (events.Count > 0) Events.UnionWith(events);
+                        else return;
                         starttime = events.Last().Timestamp;
                     }
                 }
@@ -85,8 +88,7 @@ namespace Macroscop_FaceRecReport
             document.Info.Author = "IlliumIv";
             document.CreateDocument();
 
-            var pdf = new PdfDocumentRenderer(true);
-            pdf.Document = document;
+            PdfDocumentRenderer pdf = new (true) { Document = document };
             pdf.RenderDocument();
             var filePath = OutputFile != null? OutputFile.FullName : $"Отчёт распознавания лиц {StartTime:dd.MM.yyyy HH.mm.ss} - {EndTime:dd.MM.yyyy HH.mm.ss}.pdf";
             pdf.Save(filePath);
