@@ -1,21 +1,17 @@
 ﻿using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 
-namespace Macroscop_FaceRecReport.Entities
+namespace Macroscop_FaceRecReport.Entities;
+
+public class Picture(byte[] imageBytes)
 {
-    public class Picture
+    public Image Image { get; private set; } = Image.Load(imageBytes);
+
+    public IImageFormat Format { get; private set; } = Image.DetectFormat(imageBytes);
+
+    public string Base64
     {
-        public Image Image { get; private set; }
-        public IImageFormat Format { get; private set; }
-        public string Base64
-        {
-            get { return Image.ToBase64String(Format).Split(',')[1]; }
-            private set { }
-        }
-        public Picture(byte[] imageBytes)
-        {
-            Image = Image.Load(imageBytes, out var format);
-            Format = format;
-        }
+        get => Image.ToBase64String(Format).Split(',')[1];
+        private set { }
     }
 }

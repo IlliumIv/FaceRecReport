@@ -2,7 +2,7 @@
   "profiles": {
     "Macroscop_FaceRecReport": {
       "commandName": "Project",
-      "commandLineArgs": "--server 127.0.0.1 --login root --starttime \"21.07.2022 14:50\" --endtime \"21.07.2022 15:00\" --WithDbImages"
+      "commandLineArgs": "--server 127.0.0.1 --port 8080 --login root --starttime \"13.03.2025 08:00:00\" --endtime \"15.06.2025 12:00:00\" --WithDbImages --SaveImages"
     }
   }
 }

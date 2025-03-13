@@ -1,14 +1,4 @@
-﻿namespace Macroscop_FaceRecReport.Entities
-{
-    public class Person
-    {
-        public string Id { get; private set; }
-        public string Module { get; private set; }
+﻿namespace Macroscop_FaceRecReport.Entities;
 
-        public Person (string id, string module)
-        {
-            Id = id;
-            Module = module;
-        }
-    }
-}
+public record Person(string Id, string Module)
+{ }
