@@ -2,15 +2,15 @@
 using System.Security.Authentication;
 using System.Text;
 
-namespace Macroscop_FaceRecReport;
+namespace FaceRecReport;
 
 public class Connection
 {
-    private static HttpClient? _macroscopClient;
+    private static HttpClient? _client;
 
     public static bool SendRequest(HttpRequestMessage message, out HttpResponseMessage response)
     {
-        _macroscopClient ??= Parameters.UseSSL.Value switch
+        _client ??= Parameters.UseSSL.Value switch
         {
             true => new HttpClient(new HttpClientHandler()
             {
@@ -29,7 +29,7 @@ public class Connection
         var authString = $"{Parameters.Login.Value}:" +
             $"{(Parameters.IsActiveDirectoryUser.Value ? Parameters.Password.Value : CreateMD5(Parameters.Password.Value))}";
         message.Headers.Add("Authorization", $"Basic {Convert.ToBase64String(Encoding.ASCII.GetBytes(authString))}");
-        response = _macroscopClient.Send(message);
+        response = _client.Send(message);
 
         try
         {

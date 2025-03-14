@@ -2,7 +2,7 @@
 using MigraDoc.DocumentObjectModel;
 using System.Globalization;
 
-namespace Macroscop_FaceRecReport;
+namespace FaceRecReport;
 
 public class Parameters
 {

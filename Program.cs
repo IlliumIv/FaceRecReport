@@ -2,14 +2,14 @@
 using MigraDoc.Rendering;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Tables;
-using Macroscop_FaceRecReport.Enums;
-using Macroscop_FaceRecReport.Helpers;
-using Macroscop_FaceRecReport.Entities;
+using FaceRecReport.Enums;
+using FaceRecReport.Helpers;
+using FaceRecReport.Entities;
 using Newtonsoft.Json;
 using CLIArgsHandler;
 using SixLabors.ImageSharp.Formats.Png;
 
-namespace Macroscop_FaceRecReport;
+namespace FaceRecReport;
 
 public static class Program
 {
@@ -17,8 +17,8 @@ public static class Program
 
     public static void Main(string[] args)
     {
-        var nonParams = ArgumentsHandler<Parameters>.Parse(args, $"Usage: {nameof(Macroscop_FaceRecReport)}",
-            "See https://github.com/IlliumIv/Macroscop_FaceRecReport/ to check new versions, report bugs and ask for help.");
+        var nonParams = ArgumentsHandler<Parameters>.Parse(args, $"Usage: {nameof(FaceRecReport)}",
+            "See https://github.com/IlliumIv/FaceRecReport/ to check new versions, report bugs and ask for help.");
 
         if (Parameters.ServerHost.Value == string.Empty || Parameters.Login.Value == string.Empty)
             return;
@@ -186,25 +186,25 @@ public static class Program
 
         var i = 0;
 
-        foreach (var macroscopEvent in Events)
+        foreach (var @event in Events)
         {
             i++;
-            if (macroscopEvent == null)
+            if (@event == null)
                 continue;
             row = table.AddRow();
             row.HeightRule = RowHeightRule.Exactly;
             row.Height = Parameters.ImagesWidth.Value * 0.75;
 
             row[0].AddParagraph($"{i}");
-            row[1].AddParagraph($"{macroscopEvent.Timestamp.ToLocalTime()}");
+            row[1].AddParagraph($"{@event.Timestamp.ToLocalTime()}");
 
-            if (macroscopEvent.TryGetPicture(out var picture, Parameters.ImagesWidth.Value, Parameters.ImagesWidth.Value))
+            if (@event.TryGetPicture(out var picture, Parameters.ImagesWidth.Value, Parameters.ImagesWidth.Value))
             {
                 row[2].AddImage("base64:" + picture!.Base64);
 
                 if (Parameters.SaveImages.Value && picture is not null)
                 {
-                    var imageBytes = Convert.FromBase64String(macroscopEvent.ImageBytes);
+                    var imageBytes = Convert.FromBase64String(@event.ImageBytes);
                     picture = new Picture(imageBytes);
 
                     using var memoryStream = new MemoryStream();
@@ -224,20 +224,20 @@ public static class Program
 
             if (Parameters.ExtractImagesFromDatabase.Value)
             {
-                if (macroscopEvent.TryGetPictureFromDatabase(out picture, Parameters.ImagesWidth.Value, Parameters.ImagesWidth.Value))
+                if (@event.TryGetPictureFromDatabase(out picture, Parameters.ImagesWidth.Value, Parameters.ImagesWidth.Value))
                     row[3].AddImage("base64:" + picture!.Base64);
             }
 
-            var name = $"{macroscopEvent.FirstName} {macroscopEvent.LastName} {macroscopEvent.Patronymic}".Trim();
-            var similarity = macroscopEvent.Similarity > 0 ? $"{string.Format("{0:P0}", macroscopEvent.Similarity).Replace(" ", "")}" : string.Empty;
+            var name = $"{@event.FirstName} {@event.LastName} {@event.Patronymic}".Trim();
+            var similarity = @event.Similarity > 0 ? $"{string.Format("{0:P0}", @event.Similarity).Replace(" ", "")}" : string.Empty;
             name += name != string.Empty ? $", {similarity}" : similarity;
             row[offset + 3].AddParagraph($"{name}");
-            row[offset + 4].AddParagraph($"{macroscopEvent.AdditionalInfo}");
-            row[offset + 5].AddParagraph($"{macroscopEvent.Groups?.ReplaceWhitespace()}");
-            row[offset + 6].AddParagraph($"{macroscopEvent.ChannelName}");
-            row[offset + 7].AddParagraph($"{StringEnum.GetStringValue(macroscopEvent.Gender)}");
-            row[offset + 8].AddParagraph($"{macroscopEvent.Age}");
-            row[offset + 9].AddParagraph($"{StringEnum.GetStringValue(macroscopEvent.Emotion)}, {string.Format("{0:P2}", macroscopEvent.EmotionConfidence).Replace(" ", "")}");
+            row[offset + 4].AddParagraph($"{@event.AdditionalInfo}");
+            row[offset + 5].AddParagraph($"{@event.Groups?.ReplaceWhitespace()}");
+            row[offset + 6].AddParagraph($"{@event.ChannelName}");
+            row[offset + 7].AddParagraph($"{StringEnum.GetStringValue(@event.Gender)}");
+            row[offset + 8].AddParagraph($"{@event.Age}");
+            row[offset + 9].AddParagraph($"{StringEnum.GetStringValue(@event.Emotion)}, {string.Format("{0:P2}", @event.EmotionConfidence).Replace(" ", "")}");
         }
     }
 

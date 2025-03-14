@@ -1,4 +1,4 @@
-﻿namespace Macroscop_FaceRecReport.Enums;
+﻿namespace FaceRecReport.Enums;
 
 public enum Gender
 {

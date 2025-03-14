@@ -2,7 +2,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 
-namespace Macroscop_FaceRecReport.Helpers;
+namespace FaceRecReport.Helpers;
 
 public static class StringHelper
 {

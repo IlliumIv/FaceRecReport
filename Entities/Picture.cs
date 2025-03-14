@@ -1,7 +1,7 @@
 ﻿using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 
-namespace Macroscop_FaceRecReport.Entities;
+namespace FaceRecReport.Entities;
 
 public class Picture(byte[] imageBytes)
 {

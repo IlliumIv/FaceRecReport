@@ -1,26 +1,26 @@
 ﻿using System.Text;
 using Newtonsoft.Json;
 using SixLabors.ImageSharp.Processing;
-using Macroscop_FaceRecReport.Entities;
+using FaceRecReport.Entities;
 
-namespace Macroscop_FaceRecReport.Helpers;
+namespace FaceRecReport.Helpers;
 
 public static class ImageProvider
 {
     private static readonly Dictionary<string, Picture?> _dbImagesCache = new() { { "", null } };
 
-    public static bool TryGetPictureFromDatabase(this Event macroscopEvent, out Picture? picture)
+    public static bool TryGetPictureFromDatabase(this Event @event, out Picture? picture)
     {
         picture = null;
 
-        if (!macroscopEvent.IsIdentified)
+        if (!@event.IsIdentified)
             return false;
-        if (macroscopEvent.ExternalId == string.Empty)
+        if (@event.ExternalId == string.Empty)
             return false;
-        if (_dbImagesCache.TryGetValue(macroscopEvent.ExternalId ?? string.Empty, out picture))
+        if (_dbImagesCache.TryGetValue(@event.ExternalId ?? string.Empty, out picture))
             return picture != null;
 
-        if (TryFindUniquePersonInDatabase(macroscopEvent, out var person))
+        if (TryFindUniquePersonInDatabase(@event, out var person))
         {
             var message = new HttpRequestMessage(HttpMethod.Get, $"api/faces/{person?.Id}?module={person?.Module}&onlymainsample=true");
 
@@ -39,13 +39,13 @@ public static class ImageProvider
             }
         }
 
-        _dbImagesCache.Add(macroscopEvent.ExternalId ?? string.Empty, picture);
+        _dbImagesCache.Add(@event.ExternalId ?? string.Empty, picture);
         return picture != null;
     }
 
-    public static bool TryGetPictureFromDatabase(this Event macroscopEvent, out Picture? picture, int width, int height)
+    public static bool TryGetPictureFromDatabase(this Event @event, out Picture? picture, int width, int height)
     {
-        macroscopEvent.TryGetPictureFromDatabase(out picture);
+        @event.TryGetPictureFromDatabase(out picture);
 
         width = picture?.Image.Size.Width >= picture?.Image.Size.Height ? width : 0;
         height = picture?.Image.Size.Height >= picture?.Image.Size.Width ? height : 0;
@@ -54,22 +54,22 @@ public static class ImageProvider
         return picture != null;
     }
 
-    public static bool TryGetPicture(this Event macroscopEvent, out Picture? picture)
+    public static bool TryGetPicture(this Event @event, out Picture? picture)
     {
         picture = null;
 
-        if (macroscopEvent.ImageBytes != string.Empty)
+        if (@event.ImageBytes != string.Empty)
         {
-            var imageBytes = Convert.FromBase64String(macroscopEvent.ImageBytes);
+            var imageBytes = Convert.FromBase64String(@event.ImageBytes);
             picture = new Picture(imageBytes);
         }
 
         return picture != null;
     }
 
-    public static bool TryGetPicture(this Event macroscopEvent, out Picture? picture, int width, int height)
+    public static bool TryGetPicture(this Event enevt, out Picture? picture, int width, int height)
     {
-        macroscopEvent.TryGetPicture(out picture);
+        enevt.TryGetPicture(out picture);
 
         width = picture?.Image.Size.Width >= picture?.Image.Size.Height ? width : 0;
         height = picture?.Image.Size.Height >= picture?.Image.Size.Width ? height : 0;
@@ -78,7 +78,7 @@ public static class ImageProvider
         return picture != null;
     }
 
-    private static bool TryFindUniquePersonInDatabase(Event macroscopEvent, out Person? person)
+    private static bool TryFindUniquePersonInDatabase(Event @event, out Person? person)
     {
         person = null;
 
@@ -98,7 +98,7 @@ public static class ImageProvider
                         if (!(bool)module["enabled"] || (string)module["name"] == "visitors")
                             continue;
 
-                        message = new HttpRequestMessage(HttpMethod.Get, $"api/faces?module={module["name"]}&filter=external_id='{macroscopEvent.ExternalId}'");
+                        message = new HttpRequestMessage(HttpMethod.Get, $"api/faces?module={module["name"]}&filter=external_id='{@event.ExternalId}'");
 
                         if (!Connection.SendRequest(message, out response))
                             continue;
@@ -113,10 +113,10 @@ public static class ImageProvider
 
                         if ((int)faces["total_count"] > 1 || (((int)faces["total_count"] > 0) && person != null))
                         {
-                            var filter = $"external_id='{macroscopEvent.ExternalId}'" +
-                                $" AND first_name='{macroscopEvent.FirstName}'" +
-                                $" AND last_name='{macroscopEvent.LastName}'" +
-                                $" AND patronymic='{macroscopEvent.Patronymic}'" +
+                            var filter = $"external_id='{@event.ExternalId}'" +
+                                $" AND first_name='{@event.FirstName}'" +
+                                $" AND last_name='{@event.LastName}'" +
+                                $" AND patronymic='{@event.Patronymic}'" +
                                 $" AND required_ration='100'";
 
                             message = new HttpRequestMessage(HttpMethod.Get, $"api/faces?module={module["name"]}&filter={filter}");

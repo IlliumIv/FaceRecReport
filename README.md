@@ -1,7 +1,15 @@
-Tool to export face recognition report with images from Macroscop and Eocortex servers.
-Work with 4.3.87+ versions.
+FaceRecReport
+---
 
-Usage: `.\Macroscop_FaceRecReport.exe`
+Tool to export face recognition report with images from Macroscop and Eocortex servers. Work with 4.3.87+ versions.
+
+-------
+
+Утилита для экспорта отчёта о распознанных лицах с изображениями с серверов Macroscop и Eocortex. Работает с версиями 4.3.87+.
+
+-------
+
+Usage: `.\FaceRecReport.exe`
 
 `--server <url>` - Server address. Default value is 127.0.0.1.\
 `--port <number>` - Server port. Default value is 8080.\
@@ -23,4 +31,35 @@ Usage: `.\Macroscop_FaceRecReport.exe`
 
 ---
 
-Утилита экспорта отчёта о распознанных лицах с изображениями с серверов Macroscop и Eocortex. Работает с версиями 4.3.87+.
+Third-party notice
+-----
+
+FaceRecReport uses third-party libraries or other resources that may be
+distributed under licenses different than FaceRecReport itself.
+
+In the event that i accidentally failed to list a required notice, please
+bring it to my attention by posting an issue.
+
+The attached notices are provided for information only.
+
+
+License notice for ImageSharp
+---
+
+ImageSharp used under terms of the Apache 2.0 license.
+[Click here](Apache-2.0.txt) to see full text of the license.\
+https://github.com/SixLabors/ImageSharp
+
+
+License notice for PDFsharp & MigraDoc
+---
+
+PDFsharp & MigraDoc used under terms of the MIT license.\
+https://github.com/empira/PDFsharp
+
+
+License notice for Newtonsoft.Json
+---
+
+Newtonsoft.Json used under terms of the MIT license.\
+https://github.com/JamesNK/Newtonsoft.Json

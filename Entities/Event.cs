@@ -1,6 +1,6 @@
-﻿using Macroscop_FaceRecReport.Enums;
+﻿using FaceRecReport.Enums;
 
-namespace Macroscop_FaceRecReport.Entities;
+namespace FaceRecReport.Entities;
 
 public record Event(DateTime Timestamp,
     string? ExternalId,

@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <TrimmableAssembly Remove="Macroscop_FaceRecReport.Entities.Event" />
+    <TrimmableAssembly Remove="FaceRecReport.Entities.Event" />
   </ItemGroup>
 
   <ItemGroup>
