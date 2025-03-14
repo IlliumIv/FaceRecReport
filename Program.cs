@@ -119,7 +119,7 @@ public static class Program
         table.Rows.Alignment = RowAlignment.Center;
 
         var column = table.AddColumn();
-        column.Width = Parameters.FontSize.Value * 2;
+        column.Width = Parameters.FontSize.Value * Math.Floor(Math.Log10(Events.Count));
         column.Format.Alignment = ParagraphAlignment.Center;
 
         column = table.AddColumn();
